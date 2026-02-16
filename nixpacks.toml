@@ -1,10 +1,10 @@
 [packages]
-php = "8.2"
+php = "8.3"
 composer = "*"
 
 
 [phases.setup]
-nixPkgs = ["php82", "php82Packages.composer", "python311Packages.supervisor", "nginx", "php82Extensions.redis", "php82Extensions.pdo_mysql", "php82Extensions.pdo_pgsql", "php82Extensions.pgsql", "php82Extensions.bcmath", "php82Extensions.gd", "php82Extensions.zip", "php82Extensions.intl", "php82Extensions.opcache", "php82Extensions.pcntl", "php82Extensions.exif", "php82Extensions.ftp"]
+nixPkgs = ["php83", "php83Packages.composer", "python311Packages.supervisor", "nginx", "php83Extensions.redis", "php83Extensions.pdo_mysql", "php83Extensions.pdo_pgsql", "php83Extensions.pgsql", "php83Extensions.bcmath", "php83Extensions.gd", "php83Extensions.zip", "php83Extensions.intl", "php83Extensions.opcache", "php83Extensions.pcntl", "php83Extensions.exif", "php83Extensions.ftp"]
 
 [phases.install]
 cmds = []
