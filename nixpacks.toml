@@ -1,18 +1,21 @@
 [packages]
 php = "8.2"
 composer = "*"
-nodejs = "22"
+
 
 [phases.setup]
-nixPkgs = ["php82", "php82Packages.composer", "nodejs-18_x", "python311Packages.supervisor", "nginx", "php82Extensions.redis", "php82Extensions.pdo_mysql", "php82Extensions.bcmath", "php82Extensions.gd", "php82Extensions.zip", "php82Extensions.intl", "php82Extensions.opcache", "php82Extensions.pcntl", "php82Extensions.exif", "php82Extensions.ftp"]
+nixPkgs = ["php82", "php82Packages.composer", "python311Packages.supervisor", "nginx", "php82Extensions.redis", "php82Extensions.pdo_mysql", "php82Extensions.pdo_pgsql", "php82Extensions.pgsql", "php82Extensions.bcmath", "php82Extensions.gd", "php82Extensions.zip", "php82Extensions.intl", "php82Extensions.opcache", "php82Extensions.pcntl", "php82Extensions.exif", "php82Extensions.ftp"]
 
 [phases.install]
-cmds = ["npm ci"]
+cmds = []
 
 [phases.build]
 cmds = [
     "composer install --no-dev --optimize-autoloader --no-scripts",
-    "npm run build",
+    "php artisan package:discover --ansi",
+    "php artisan vendor:publish --tag=laravel-assets --ansi --force",
+    "php artisan vendor:publish --tag=cachet-assets --ansi --force",
+    "php artisan filament:assets --ansi",
     "composer dump-autoload --optimize",
     "mkdir -p /etc/supervisor/conf.d/",
     "cp /assets/worker-*.conf /etc/supervisor/conf.d/",
