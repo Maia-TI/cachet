@@ -30,4 +30,4 @@ Artisan::command('inspire', function () {
 use App\Console\Commands\MonitorJanelaUnica;
 use Illuminate\Support\Facades\Schedule;
 
-// Schedule::command(MonitorJanelaUnica::class)->everyMinute();
+Schedule::command(MonitorJanelaUnica::class)->everyMinute();
