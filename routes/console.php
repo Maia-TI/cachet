@@ -28,6 +28,8 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 use App\Console\Commands\MonitorJanelaUnica;
+use App\Console\Commands\MonitorJuFinanceiro;
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::command(MonitorJanelaUnica::class)->everyMinute();
+Schedule::command(MonitorJuFinanceiro::class)->everyMinute();
