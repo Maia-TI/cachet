@@ -39,21 +39,24 @@ class MonitorJanelaUnica extends Command
             $response = Http::timeout($timeout)->get($url);
 
             if ($response->failed()) {
-                $this->handleFailure("Janela Única is down (HTTP {$response->status()})");
+                $publicMessage = "No momento, identificamos uma instabilidade no acesso ao sistema Janela Única. Nossa equipe técnica já foi acionada e está atuando para normalizar o serviço o mais rápido possível.";
+                $this->handleFailure("Janela Única is down (HTTP {$response->status()})", $publicMessage);
                 return;
             }
 
-            $this->handleSuccess("Janela Única is UP (HTTP {$response->status()})");
+            $publicMessage = "O acesso ao sistema Janela Única foi restabelecido e está funcionando normalmente. Agradecemos pela compreensão.";
+            $this->handleSuccess("Janela Única is UP (HTTP {$response->status()})", $publicMessage);
         } catch (\Exception $e) {
-            $this->handleFailure("Janela Única is unreachable (Timeout/Error: {$e->getMessage()})");
+            $publicMessage = "No momento, identificamos uma instabilidade no acesso ao sistema Janela Única. Nossa equipe técnica já foi acionada e está atuando para normalizar o serviço o mais rápido possível.";
+            $this->handleFailure("Janela Única is unreachable (Timeout/Error: {$e->getMessage()})", $publicMessage);
         }
     }
 
-    private function handleFailure(string $message)
+    private function handleFailure(string $consoleMessage, string $publicMessage)
     {
-        $this->error($message);
+        $this->error($consoleMessage);
 
-        $incidentName = 'Janela Única Outage';
+        $incidentName = 'Instabilidade no Sistema Janela Única';
 
         // Check for existing unresolved incident with the same name
         $existingIncident = Incident::query()
@@ -71,7 +74,7 @@ class MonitorJanelaUnica extends Command
         $data = new CreateIncidentRequestData(
             name: $incidentName,
             status: IncidentStatusEnum::investigating,
-            message: $message,
+            message: $publicMessage,
             visible: true,
             stickied: false,
             notifications: true, // Notify subscribers
@@ -90,9 +93,9 @@ class MonitorJanelaUnica extends Command
         $this->info("Incident created and component status updated.");
     }
 
-    private function handleSuccess(string $message)
+    private function handleSuccess(string $consoleMessage, string $publicMessage)
     {
-        $incidentName = 'Janela Única Outage';
+        $incidentName = 'Instabilidade no Sistema Janela Única';
 
         // Check for existing unresolved incident
         $incident = Incident::query()
@@ -100,10 +103,18 @@ class MonitorJanelaUnica extends Command
             ->unresolved()
             ->first();
 
+        // Also check for the old English name to resolve previous incidents properly
+        if (!$incident) {
+            $incident = Incident::query()
+                ->where('name', 'Janela Única Outage')
+                ->unresolved()
+                ->first();
+        }
+
         if ($incident) {
             $incident->update([
                 'status' => IncidentStatusEnum::fixed,
-                'message' => $incident->message . "\n\n**Resolved:** " . $message,
+                'message' => $incident->message . "\n\n**Resolvido:** " . $publicMessage,
             ]);
 
             // Update component status back to operational
@@ -113,7 +124,7 @@ class MonitorJanelaUnica extends Command
 
             $this->info("Incident resolved and component status updated to Operational.");
         } else {
-            $this->info($message);
+            $this->info($consoleMessage);
         }
     }
 }
