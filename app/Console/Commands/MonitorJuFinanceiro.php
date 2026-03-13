@@ -57,8 +57,8 @@ class MonitorJuFinanceiro extends Command
         $this->error($consoleMessage);
 
         $incidentName = 'Instabilidade no Sistema Janela Única Financeiro';
-        $component = Component::where('name', 'like', '%Financeiro%')->first();
-        $componentId = $component ? $component->id : 2;
+        $component = Component::firstOrCreate(['name' => 'Ju Financeiro Api']);
+        $componentId = $component->id;
 
         // Check for existing unresolved incident with the same name
         $existingIncident = Incident::query()
