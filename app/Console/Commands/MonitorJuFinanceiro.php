@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Carbon;
 use Cachet\Actions\Incident\CreateIncident;
 use Cachet\Data\Requests\Incident\CreateIncidentRequestData;
 use Cachet\Enums\IncidentStatusEnum;
@@ -39,15 +40,15 @@ class MonitorJuFinanceiro extends Command
             $response = Http::timeout($timeout)->get($url);
 
             if ($response->failed()) {
-                $publicMessage = "No momento, identificamos uma instabilidade no acesso ao sistema Janela Única Financeiro. Nossa equipe técnica já foi acionada e está atuando para normalizar o serviço o mais rápido possível.";
+                $publicMessage = "JU Financeiro está indisponível (HTTP {$response->status()}). Investigação em andamento.";
                 $this->handleFailure("JU Financeiro is down (HTTP {$response->status()})", $publicMessage);
                 return;
             }
 
-            $publicMessage = "O acesso ao sistema Janela Única Financeiro foi restabelecido e está funcionando normalmente. Agradecemos pela compreensão.";
+            $publicMessage = "JU Financeiro voltou a operar normalmente.";
             $this->handleSuccess("JU Financeiro is UP (HTTP {$response->status()})", $publicMessage);
         } catch (\Exception $e) {
-            $publicMessage = "No momento, identificamos uma instabilidade no acesso ao sistema Janela Única Financeiro. Nossa equipe técnica já foi acionada e está atuando para normalizar o serviço o mais rápido possível.";
+            $publicMessage = "JU Financeiro está inacessível (timeout/erro de conexão). Investigação em andamento.";
             $this->handleFailure("JU Financeiro is unreachable (Timeout/Error: {$e->getMessage()})", $publicMessage);
         }
     }
@@ -56,7 +57,7 @@ class MonitorJuFinanceiro extends Command
     {
         $this->error($consoleMessage);
 
-        $incidentName = 'Instabilidade no Sistema Janela Única Financeiro';
+        $incidentName = 'Incidente: JU Financeiro';
 
         // Check for existing unresolved incident with the same name
         $existingIncident = Incident::query()
@@ -86,18 +87,16 @@ class MonitorJuFinanceiro extends Command
         app(CreateIncident::class)->handle($data);
 
         // Update component status
-        if ($componentId) {
-            Component::find($componentId)?->update([
-                'status' => ComponentStatusEnum::major_outage,
-            ]);
-        }
+        Component::find(2)?->update([
+            'status' => ComponentStatusEnum::major_outage,
+        ]);
 
         $this->info("Incident created and component status updated.");
     }
 
     private function handleSuccess(string $consoleMessage, string $publicMessage)
     {
-        $incidentName = 'Instabilidade no Sistema Janela Única Financeiro';
+        $incidentName = 'Incidente: JU Financeiro';
 
         // Check for existing unresolved incident
         $incident = Incident::query()
@@ -106,9 +105,11 @@ class MonitorJuFinanceiro extends Command
             ->first();
 
         if ($incident) {
+            $downtimeDuration = $this->formatDowntime($incident->created_at);
+
             $incident->update([
                 'status' => IncidentStatusEnum::fixed,
-                'message' => $incident->message . "\n\n**Resolvido:** " . $publicMessage,
+                'message' => $incident->message . "\n\n**Resolvido.** {$publicMessage} Tempo de indisponibilidade: **{$downtimeDuration}**.",
             ]);
 
             $component = Component::where('name', 'like', '%Financeiro%')->first();
@@ -121,9 +122,30 @@ class MonitorJuFinanceiro extends Command
                 ]);
             }
 
-            $this->info("Incident resolved and component status updated to Operational.");
+            $this->info("Incident resolved and component status updated to Operational. Downtime: {$downtimeDuration}");
         } else {
             $this->info($consoleMessage);
         }
+    }
+
+    private function formatDowntime(Carbon $since): string
+    {
+        $diff = $since->diff(Carbon::now());
+
+        $parts = [];
+        if ($diff->d > 0) {
+            $parts[] = $diff->d . ' ' . ($diff->d === 1 ? 'dia' : 'dias');
+        }
+        if ($diff->h > 0) {
+            $parts[] = $diff->h . ' ' . ($diff->h === 1 ? 'hora' : 'horas');
+        }
+        if ($diff->i > 0) {
+            $parts[] = $diff->i . ' ' . ($diff->i === 1 ? 'minuto' : 'minutos');
+        }
+        if (empty($parts)) {
+            $parts[] = $diff->s . ' ' . ($diff->s === 1 ? 'segundo' : 'segundos');
+        }
+
+        return implode(', ', $parts);
     }
 }

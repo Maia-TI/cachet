@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Carbon;
 use Cachet\Actions\Incident\CreateIncident;
 use Cachet\Data\Requests\Incident\CreateIncidentRequestData;
 use Cachet\Enums\IncidentStatusEnum;
@@ -39,15 +40,15 @@ class MonitorJanelaUnica extends Command
             $response = Http::timeout($timeout)->get($url);
 
             if ($response->failed()) {
-                $publicMessage = "No momento, identificamos uma instabilidade no acesso ao sistema Janela Única. Nossa equipe técnica já foi acionada e está atuando para normalizar o serviço o mais rápido possível.";
+                $publicMessage = "O sistema Janela Única está indisponível (HTTP {$response->status()}). Investigação em andamento.";
                 $this->handleFailure("Janela Única is down (HTTP {$response->status()})", $publicMessage);
                 return;
             }
 
-            $publicMessage = "O acesso ao sistema Janela Única foi restabelecido e está funcionando normalmente. Agradecemos pela compreensão.";
+            $publicMessage = "O sistema Janela Única voltou a operar normalmente.";
             $this->handleSuccess("Janela Única is UP (HTTP {$response->status()})", $publicMessage);
         } catch (\Exception $e) {
-            $publicMessage = "No momento, identificamos uma instabilidade no acesso ao sistema Janela Única. Nossa equipe técnica já foi acionada e está atuando para normalizar o serviço o mais rápido possível.";
+            $publicMessage = "O sistema Janela Única está inacessível (timeout/erro de conexão). Investigação em andamento.";
             $this->handleFailure("Janela Única is unreachable (Timeout/Error: {$e->getMessage()})", $publicMessage);
         }
     }
@@ -56,7 +57,7 @@ class MonitorJanelaUnica extends Command
     {
         $this->error($consoleMessage);
 
-        $incidentName = 'Instabilidade no Sistema Janela Única';
+        $incidentName = 'Incidente: Sistema Janela Única';
 
         // Check for existing unresolved incident with the same name
         $existingIncident = Incident::query()
@@ -95,7 +96,7 @@ class MonitorJanelaUnica extends Command
 
     private function handleSuccess(string $consoleMessage, string $publicMessage)
     {
-        $incidentName = 'Instabilidade no Sistema Janela Única';
+        $incidentName = 'Incidente: Sistema Janela Única';
 
         // Check for existing unresolved incident
         $incident = Incident::query()
@@ -112,9 +113,11 @@ class MonitorJanelaUnica extends Command
         }
 
         if ($incident) {
+            $downtimeDuration = $this->formatDowntime($incident->created_at);
+
             $incident->update([
                 'status' => IncidentStatusEnum::fixed,
-                'message' => $incident->message . "\n\n**Resolvido:** " . $publicMessage,
+                'message' => $incident->message . "\n\n**Resolvido.** {$publicMessage} Tempo de indisponibilidade: **{$downtimeDuration}**.",
             ]);
 
             // Update component status back to operational
@@ -122,9 +125,30 @@ class MonitorJanelaUnica extends Command
                 'status' => ComponentStatusEnum::operational,
             ]);
 
-            $this->info("Incident resolved and component status updated to Operational.");
+            $this->info("Incident resolved and component status updated to Operational. Downtime: {$downtimeDuration}");
         } else {
             $this->info($consoleMessage);
         }
+    }
+
+    private function formatDowntime(Carbon $since): string
+    {
+        $diff = $since->diff(Carbon::now());
+
+        $parts = [];
+        if ($diff->d > 0) {
+            $parts[] = $diff->d . ' ' . ($diff->d === 1 ? 'dia' : 'dias');
+        }
+        if ($diff->h > 0) {
+            $parts[] = $diff->h . ' ' . ($diff->h === 1 ? 'hora' : 'horas');
+        }
+        if ($diff->i > 0) {
+            $parts[] = $diff->i . ' ' . ($diff->i === 1 ? 'minuto' : 'minutos');
+        }
+        if (empty($parts)) {
+            $parts[] = $diff->s . ' ' . ($diff->s === 1 ? 'segundo' : 'segundos');
+        }
+
+        return implode(', ', $parts);
     }
 }
