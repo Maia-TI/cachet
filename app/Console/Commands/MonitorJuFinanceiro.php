@@ -43,14 +43,14 @@ class MonitorJuFinanceiro extends Command
                 $response = Http::timeout($timeout)->get($url);
 
                 if ($response->failed()) {
-                    $publicMessage = "JU Financeiro está indisponível (HTTP {$response->status()}). Investigação em andamento.";
+                    $publicMessage = "JU Financeiro está indisponível (HTTP {$response->status()}). ";
                     $this->handleFailure("JU Financeiro is down (HTTP {$response->status()})", $publicMessage);
                 } else {
                     $publicMessage = "JU Financeiro voltou a operar normalmente.";
                     $this->handleSuccess("JU Financeiro is UP (HTTP {$response->status()})", $publicMessage);
                 }
             } catch (\Exception $e) {
-                $publicMessage = "JU Financeiro está inacessível (timeout/erro de conexão). Investigação em andamento.";
+                $publicMessage = "JU Financeiro está inacessível (timeout/erro de conexão). ";
                 $this->handleFailure("JU Financeiro is unreachable (Timeout/Error: {$e->getMessage()})", $publicMessage);
             }
 
