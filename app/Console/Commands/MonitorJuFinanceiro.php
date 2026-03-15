@@ -33,7 +33,7 @@ class MonitorJuFinanceiro extends Command
      */
     public function handle()
     {
-        $url = 'https://api.financeiro.janelaunica.com.br/api/ziggy';
+        $url = 'https://api.financeiro.janelaunica.com.br/up';
         $timeout = 5;
         $iterations = 6;
         $secondsBetween = 10;
