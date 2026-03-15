@@ -43,14 +43,14 @@ class MonitorJanelaUnica extends Command
                 $response = Http::timeout($timeout)->get($url);
 
                 if ($response->failed()) {
-                    $publicMessage = "Janela Única está indisponível (HTTP {$response->status()}). ";
+                    $publicMessage = "Janela Única indisponível (HTTP {$response->status()}). ";
                     $this->handleFailure("Janela Única is down (HTTP {$response->status()})", $publicMessage);
                 } else {
-                    $publicMessage = "Janela Única voltou a operar normalmente.";
+                    $publicMessage = "Janela Única online.";
                     $this->handleSuccess("Janela Única is UP (HTTP {$response->status()})", $publicMessage);
                 }
             } catch (\Exception $e) {
-                $publicMessage = "Janela Única está inacessível (timeout/erro de conexão). ";
+                $publicMessage = "Janela Única inacessível (timeout/erro de conexão). ";
                 $this->handleFailure("Janela Única is unreachable (Timeout/Error: {$e->getMessage()})", $publicMessage);
             }
 
