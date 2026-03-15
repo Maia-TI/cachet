@@ -64,7 +64,7 @@ class MonitorJanelaUnica extends Command
     {
         $this->error($consoleMessage);
 
-        $incidentName = 'Incidente: Sistema Janela Única';
+        $incidentName = 'Incidente: Janela Única';
 
         // Check for existing unresolved incident with the same name
         $existingIncident = Incident::query()
@@ -103,7 +103,7 @@ class MonitorJanelaUnica extends Command
 
     private function handleSuccess(string $consoleMessage, string $publicMessage)
     {
-        $incidentName = 'Incidente: Sistema Janela Única';
+        $incidentName = 'Incidente: Janela Única';
 
         // Check for existing unresolved incident
         $incident = Incident::query()
