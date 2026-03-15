@@ -35,21 +35,28 @@ class MonitorJanelaUnica extends Command
     {
         $url = 'https://janelaunica.com.br/up';
         $timeout = 5;
+        $iterations = 6;
+        $secondsBetween = 10;
 
-        try {
-            $response = Http::timeout($timeout)->get($url);
+        for ($i = 0; $i < $iterations; $i++) {
+            try {
+                $response = Http::timeout($timeout)->get($url);
 
-            if ($response->failed()) {
-                $publicMessage = "O sistema Janela Única está indisponível (HTTP {$response->status()}). Investigação em andamento.";
-                $this->handleFailure("Janela Única is down (HTTP {$response->status()})", $publicMessage);
-                return;
+                if ($response->failed()) {
+                    $publicMessage = "Janela Única está indisponível (HTTP {$response->status()}). Investigação em andamento.";
+                    $this->handleFailure("Janela Única is down (HTTP {$response->status()})", $publicMessage);
+                } else {
+                    $publicMessage = "Janela Única voltou a operar normalmente.";
+                    $this->handleSuccess("Janela Única is UP (HTTP {$response->status()})", $publicMessage);
+                }
+            } catch (\Exception $e) {
+                $publicMessage = "Janela Única está inacessível (timeout/erro de conexão). Investigação em andamento.";
+                $this->handleFailure("Janela Única is unreachable (Timeout/Error: {$e->getMessage()})", $publicMessage);
             }
 
-            $publicMessage = "O sistema Janela Única voltou a operar normalmente.";
-            $this->handleSuccess("Janela Única is UP (HTTP {$response->status()})", $publicMessage);
-        } catch (\Exception $e) {
-            $publicMessage = "O sistema Janela Única está inacessível (timeout/erro de conexão). Investigação em andamento.";
-            $this->handleFailure("Janela Única is unreachable (Timeout/Error: {$e->getMessage()})", $publicMessage);
+            if ($i < $iterations - 1) {
+                sleep($secondsBetween);
+            }
         }
     }
 

@@ -31,5 +31,5 @@ use App\Console\Commands\MonitorJanelaUnica;
 use App\Console\Commands\MonitorJuFinanceiro;
 use Illuminate\Support\Facades\Schedule;
 
-Schedule::command(MonitorJanelaUnica::class)->everyMinute();
-Schedule::command(MonitorJuFinanceiro::class)->everyMinute();
+Schedule::command(MonitorJanelaUnica::class)->everyMinute()->withoutOverlapping();
+Schedule::command(MonitorJuFinanceiro::class)->everyMinute()->withoutOverlapping();

@@ -35,21 +35,28 @@ class MonitorJuFinanceiro extends Command
     {
         $url = 'https://api.financeiro.janelaunica.com.br/api/ziggy';
         $timeout = 5;
+        $iterations = 6;
+        $secondsBetween = 10;
 
-        try {
-            $response = Http::timeout($timeout)->get($url);
+        for ($i = 0; $i < $iterations; $i++) {
+            try {
+                $response = Http::timeout($timeout)->get($url);
 
-            if ($response->failed()) {
-                $publicMessage = "JU Financeiro está indisponível (HTTP {$response->status()}). Investigação em andamento.";
-                $this->handleFailure("JU Financeiro is down (HTTP {$response->status()})", $publicMessage);
-                return;
+                if ($response->failed()) {
+                    $publicMessage = "JU Financeiro está indisponível (HTTP {$response->status()}). Investigação em andamento.";
+                    $this->handleFailure("JU Financeiro is down (HTTP {$response->status()})", $publicMessage);
+                } else {
+                    $publicMessage = "JU Financeiro voltou a operar normalmente.";
+                    $this->handleSuccess("JU Financeiro is UP (HTTP {$response->status()})", $publicMessage);
+                }
+            } catch (\Exception $e) {
+                $publicMessage = "JU Financeiro está inacessível (timeout/erro de conexão). Investigação em andamento.";
+                $this->handleFailure("JU Financeiro is unreachable (Timeout/Error: {$e->getMessage()})", $publicMessage);
             }
 
-            $publicMessage = "JU Financeiro voltou a operar normalmente.";
-            $this->handleSuccess("JU Financeiro is UP (HTTP {$response->status()})", $publicMessage);
-        } catch (\Exception $e) {
-            $publicMessage = "JU Financeiro está inacessível (timeout/erro de conexão). Investigação em andamento.";
-            $this->handleFailure("JU Financeiro is unreachable (Timeout/Error: {$e->getMessage()})", $publicMessage);
+            if ($i < $iterations - 1) {
+                sleep($secondsBetween);
+            }
         }
     }
 
