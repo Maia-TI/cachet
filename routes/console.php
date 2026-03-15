@@ -29,7 +29,9 @@ Artisan::command('inspire', function () {
 
 use App\Console\Commands\MonitorJanelaUnica;
 use App\Console\Commands\MonitorJuFinanceiro;
+use App\Console\Commands\MonitorDeepFace;
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::command(MonitorJanelaUnica::class)->everyMinute()->withoutOverlapping();
 Schedule::command(MonitorJuFinanceiro::class)->everyMinute()->withoutOverlapping();
+Schedule::command(MonitorDeepFace::class)->everyMinute()->withoutOverlapping();
