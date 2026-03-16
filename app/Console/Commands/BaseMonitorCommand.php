@@ -12,6 +12,7 @@ use Cachet\Models\Incident;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 abstract class BaseMonitorCommand extends Command implements MonitorInterface
 {
@@ -25,6 +26,7 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
      */
     public function handle(): void
     {
+        Log::info("Running monitor: {$this->getMonitorName()} [{$this->getUrl()}]");
         $this->ensureComponentExists();
 
         $url = $this->getUrl();
@@ -43,6 +45,8 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
             $publicMessage = "{$this->getPublicName()} está inacessível (timeout/erro de conexão). ";
             $this->handleFailure("{$this->getPublicName()} is unreachable (Timeout/Error: {$e->getMessage()})", $publicMessage);
         }
+
+        Log::info("Monitor finished: {$this->getMonitorName()}");
     }
 
     /**
@@ -78,6 +82,7 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
      */
     protected function handleFailure(string $consoleMessage, string $publicMessage): void
     {
+        Log::error("[Monitor Failure] {$this->getMonitorName()}: {$consoleMessage}");
         $this->error($consoleMessage);
 
         $incidentName = 'Incidente: ' . $this->getMonitorName();
@@ -122,6 +127,7 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
      */
     protected function handleSuccess(string $consoleMessage, string $publicMessage): void
     {
+        Log::info("[Monitor Success] {$this->getMonitorName()}: {$consoleMessage}");
         $incidentName = 'Incidente: ' . $this->getMonitorName();
 
         // Check for existing unresolved incident
