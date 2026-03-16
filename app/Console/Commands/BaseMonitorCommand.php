@@ -21,16 +21,6 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
     protected int $timeout = 5;
 
     /**
-     * Number of iterations to check the service.
-     */
-    protected int $iterations = 6;
-
-    /**
-     * Seconds to wait between iterations.
-     */
-    protected int $secondsBetween = 10;
-
-    /**
      * Execute the console command.
      */
     public function handle(): void
@@ -39,25 +29,19 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
 
         $url = $this->getUrl();
 
-        for ($i = 0; $i < $this->iterations; $i++) {
-            try {
-                $response = $this->performRequest($url);
+        try {
+            $response = $this->performRequest($url);
 
-                if ($response->failed()) {
-                    $publicMessage = "{$this->getPublicName()} está indisponível (HTTP {$response->status()}). ";
-                    $this->handleFailure("{$this->getPublicName()} is down (HTTP {$response->status()})", $publicMessage);
-                } else {
-                    $publicMessage = "{$this->getPublicName()} " . ($this->getPublicName() === 'Janela Única' ? 'online.' : 'voltou a operar normalmente.');
-                    $this->handleSuccess("{$this->getPublicName()} is UP (HTTP {$response->status()})", $publicMessage);
-                }
-            } catch (\Exception $e) {
-                $publicMessage = "{$this->getPublicName()} está inacessível (timeout/erro de conexão). ";
-                $this->handleFailure("{$this->getPublicName()} is unreachable (Timeout/Error: {$e->getMessage()})", $publicMessage);
+            if ($response->failed()) {
+                $publicMessage = "{$this->getPublicName()} está indisponível (HTTP {$response->status()}). ";
+                $this->handleFailure("{$this->getPublicName()} is down (HTTP {$response->status()})", $publicMessage);
+            } else {
+                $publicMessage = "{$this->getPublicName()} " . ($this->getPublicName() === 'Janela Única' ? 'online.' : 'voltou a operar normalmente.');
+                $this->handleSuccess("{$this->getPublicName()} is UP (HTTP {$response->status()})", $publicMessage);
             }
-
-            if ($i < $this->iterations - 1) {
-                sleep($this->secondsBetween);
-            }
+        } catch (\Exception $e) {
+            $publicMessage = "{$this->getPublicName()} está inacessível (timeout/erro de conexão). ";
+            $this->handleFailure("{$this->getPublicName()} is unreachable (Timeout/Error: {$e->getMessage()})", $publicMessage);
         }
     }
 
