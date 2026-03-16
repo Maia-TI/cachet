@@ -119,12 +119,11 @@ class MonitorJuFinanceiro extends Command
                 'message' => $incident->message . "\n\n**Resolvido.** {$publicMessage} Tempo de indisponibilidade: **{$downtimeDuration}**.",
             ]);
 
-            $component = Component::where('name', 'like', '%Financeiro%')->first();
-            $componentId = $component ? $component->id : 2;
+            $component = Component::find(2);
 
             // Update component status back to operational
-            if ($componentId) {
-                Component::find($componentId)?->update([
+            if ($component) {
+                $component->update([
                     'status' => ComponentStatusEnum::operational,
                 ]);
             }
