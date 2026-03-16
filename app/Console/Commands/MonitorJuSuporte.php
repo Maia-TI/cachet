@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use Illuminate\Support\Facades\Http;
+
 class MonitorJuSuporte extends BaseMonitorCommand
 {
     /**
@@ -20,7 +22,7 @@ class MonitorJuSuporte extends BaseMonitorCommand
 
     public function getUrl(): string
     {
-        return 'https://suporte.janelaunica.com.br/home';
+        return 'https://suporte.janelaunica.com.br/';
     }
 
     public function getComponentId(): int
@@ -36,5 +38,13 @@ class MonitorJuSuporte extends BaseMonitorCommand
     public function getPublicName(): string
     {
         return 'JU Suporte';
+    }
+
+    /**
+     * Perform the HTTP request without SSL verification for this specific endpoint.
+     */
+    protected function performRequest(string $url)
+    {
+        return Http::timeout($this->timeout)->withoutVerifying()->get($url);
     }
 }
