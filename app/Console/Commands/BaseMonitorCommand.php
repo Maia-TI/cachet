@@ -35,6 +35,8 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
      */
     public function handle(): void
     {
+        $this->ensureComponentExists();
+
         $url = $this->getUrl();
 
         for ($i = 0; $i < $this->iterations; $i++) {
@@ -56,6 +58,26 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
             if ($i < $this->iterations - 1) {
                 sleep($this->secondsBetween);
             }
+        }
+    }
+
+    /**
+     * Ensure the component exists in the database.
+     */
+    protected function ensureComponentExists(): void
+    {
+        $component = Component::find($this->getComponentId());
+
+        if (!$component) {
+            $this->info("Creating component: {$this->getMonitorName()} (ID: {$this->getComponentId()})");
+            
+            Component::query()->forceCreate([
+                'id' => $this->getComponentId(),
+                'name' => $this->getMonitorName(),
+                'status' => ComponentStatusEnum::operational,
+                'enabled' => true,
+                'description' => 'Monitorado automaticamente',
+            ]);
         }
     }
 
