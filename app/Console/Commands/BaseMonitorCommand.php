@@ -88,6 +88,11 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
             ->unresolved()
             ->exists();
 
+            // Always ensure component status reflects the failure
+        Component::find($this->getComponentId())?->update([
+            'status' => ComponentStatusEnum::major_outage,
+        ]);
+
         if ($existingIncident) {
             $this->info("An unresolved incident already exists. Skipping creation.");
             return;
@@ -108,11 +113,6 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
         );
 
         app(CreateIncident::class)->handle($data);
-
-        // Update component status
-        Component::find($this->getComponentId())?->update([
-            'status' => ComponentStatusEnum::major_outage,
-        ]);
 
         $this->info("Incident created and component status updated.");
     }

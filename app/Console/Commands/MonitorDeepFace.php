@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use Illuminate\Support\Facades\Http;
+
 class MonitorDeepFace extends BaseMonitorCommand
 {
     /**
@@ -36,5 +38,13 @@ class MonitorDeepFace extends BaseMonitorCommand
     public function getPublicName(): string
     {
         return 'DeepFace';
+    }
+
+    /**
+     * Perform the HTTP request without SSL verification for this specific endpoint.
+     */
+    protected function performRequest(string $url)
+    {
+        return Http::timeout($this->timeout)->withoutVerifying()->get($url);
     }
 }
