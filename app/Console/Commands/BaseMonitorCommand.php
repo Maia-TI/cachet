@@ -26,27 +26,53 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
      */
     public function handle(): void
     {
-        Log::info("Running monitor: {$this->getMonitorName()} [{$this->getUrl()}]");
-        $this->ensureComponentExists();
-
+        $monitorName = $this->getMonitorName();
         $url = $this->getUrl();
+        
+        Log::info("Running monitor: {$monitorName} [{$url}]");
+
+        try {
+            $this->ensureComponentExists();
+        } catch (\Exception $e) {
+            Log::warning("Could not ensure component exists for {$monitorName}: {$e->getMessage()}");
+        }
 
         try {
             $response = $this->performRequest($url);
 
             if ($response->failed()) {
-                $publicMessage = "{$this->getPublicName()} está indisponível (HTTP {$response->status()}). ";
-                $this->handleFailure("{$this->getPublicName()} is down (HTTP {$response->status()})", $publicMessage);
+                $status = $response->status();
+                $publicMessage = "{$this->getPublicName()} está indisponível (HTTP {$status}). ";
+                Log::error("[Monitor Failed] {$monitorName}: HTTP {$status}");
+                
+                try {
+                    $this->handleFailure("{$this->getPublicName()} is down (HTTP {$status})", $publicMessage);
+                } catch (\Exception $e) {
+                    Log::error("Failed to record failure in DB for {$monitorName}: {$e->getMessage()}");
+                }
             } else {
+                $status = $response->status();
                 $publicMessage = "{$this->getPublicName()} " . ($this->getPublicName() === 'Janela Única' ? 'online.' : 'voltou a operar normalmente.');
-                $this->handleSuccess("{$this->getPublicName()} is UP (HTTP {$response->status()})", $publicMessage);
+                Log::info("[Monitor Success] {$monitorName}: HTTP {$status}");
+                
+                try {
+                    $this->handleSuccess("{$this->getPublicName()} is UP (HTTP {$status})", $publicMessage);
+                } catch (\Exception $e) {
+                    Log::error("Failed to record success in DB for {$monitorName}: {$e->getMessage()}");
+                }
             }
         } catch (\Exception $e) {
             $publicMessage = "{$this->getPublicName()} está inacessível (timeout/erro de conexão). ";
-            $this->handleFailure("{$this->getPublicName()} is unreachable (Timeout/Error: {$e->getMessage()})", $publicMessage);
+            Log::error("[Monitor Error] {$monitorName}: {$e->getMessage()}");
+            
+            try {
+                $this->handleFailure("{$this->getPublicName()} is unreachable (Timeout/Error: {$e->getMessage()})", $publicMessage);
+            } catch (\Exception $e) {
+                Log::error("Failed to record reachability error in DB for {$monitorName}: {$e->getMessage()}");
+            }
         }
 
-        Log::info("Monitor finished: {$this->getMonitorName()}");
+        Log::info("Monitor finished: {$monitorName}");
     }
 
     /**
