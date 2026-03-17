@@ -13,6 +13,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 abstract class BaseMonitorCommand extends Command implements MonitorInterface
 {
@@ -108,44 +109,63 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
      */
     protected function handleFailure(string $consoleMessage, string $publicMessage): void
     {
-        Log::error("[Monitor Failure] {$this->getMonitorName()}: {$consoleMessage}");
-        $this->error($consoleMessage);
+        Cache::lock("monitor_lock_{$this->getComponentId()}", 10)->get(function () use ($consoleMessage, $publicMessage) {
+            Log::error("[Monitor Failure] {$this->getMonitorName()}: {$consoleMessage}");
+            $this->error($consoleMessage);
 
-        $incidentName = 'Incidente: ' . $this->getMonitorName();
+            $incidentName = 'Incidente: ' . $this->getMonitorName();
 
-        // Check for existing unresolved incident with the same name
-        $existingIncident = Incident::query()
-            ->where('name', $incidentName)
-            ->unresolved()
-            ->exists();
+            // Check for existing unresolved incident with the same name
+            $existingIncident = Incident::query()
+                ->where('name', $incidentName)
+                ->unresolved()
+                ->first();
 
             // Always ensure component status reflects the failure
-        Component::find($this->getComponentId())?->update([
-            'status' => ComponentStatusEnum::major_outage,
-        ]);
+            Component::find($this->getComponentId())?->update([
+                'status' => ComponentStatusEnum::major_outage,
+            ]);
 
-        if ($existingIncident) {
-            $this->info("An unresolved incident already exists. Skipping creation.");
-            return;
-        }
+            if ($existingIncident) {
+                $this->info("An unresolved incident already exists. Skipping creation.");
+                return;
+            }
 
-        $this->info("Creating new incident...");
+            // Check for a recently resolved incident (within 2 minutes) to "merge" the instability
+            $recentIncident = Incident::query()
+                ->where('name', $incidentName)
+                ->where('status', IncidentStatusEnum::fixed)
+                ->where('updated_at', '>', now()->subMinutes(2))
+                ->orderBy('updated_at', 'desc')
+                ->first();
 
-        $data = new CreateIncidentRequestData(
-            name: $incidentName,
-            status: IncidentStatusEnum::investigating,
-            message: $publicMessage,
-            visible: true,
-            stickied: false,
-            notifications: true,
-            occurredAt: now()->toDateTimeString(),
-            componentId: $this->getComponentId(),
-            componentStatus: ComponentStatusEnum::major_outage,
-        );
+            if ($recentIncident) {
+                $this->info("A recently resolved incident exists. Reopening it instead of creating a new one.");
+                $recentIncident->update([
+                    'status' => IncidentStatusEnum::investigating,
+                    'message' => $recentIncident->message . "\n\n**Reaberto por instabilidade recorrente.**\n\n{$publicMessage}",
+                ]);
+                return;
+            }
 
-        app(CreateIncident::class)->handle($data);
+            $this->info("Creating new incident...");
 
-        $this->info("Incident created and component status updated.");
+            $data = new CreateIncidentRequestData(
+                name: $incidentName,
+                status: IncidentStatusEnum::investigating,
+                message: $publicMessage,
+                visible: true,
+                stickied: false,
+                notifications: true,
+                occurredAt: now()->toDateTimeString(),
+                componentId: $this->getComponentId(),
+                componentStatus: ComponentStatusEnum::major_outage,
+            );
+
+            app(CreateIncident::class)->handle($data);
+
+            $this->info("Incident created and component status updated.");
+        });
     }
 
     /**
@@ -153,40 +173,42 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
      */
     protected function handleSuccess(string $consoleMessage, string $publicMessage): void
     {
-        Log::info("[Monitor Success] {$this->getMonitorName()}: {$consoleMessage}");
-        $incidentName = 'Incidente: ' . $this->getMonitorName();
+        Cache::lock("monitor_lock_{$this->getComponentId()}", 10)->get(function () use ($consoleMessage, $publicMessage) {
+            Log::info("[Monitor Success] {$this->getMonitorName()}: {$consoleMessage}");
+            $incidentName = 'Incidente: ' . $this->getMonitorName();
 
-        // Check for existing unresolved incident
-        $incident = Incident::query()
-            ->where('name', $incidentName)
-            ->unresolved()
-            ->first();
-
-        // Compatibility with old naming patterns if needed (like in MonitorJanelaUnica)
-        if (!$incident && $this->getMonitorName() === 'Janela Única') {
+            // Check for existing unresolved incident
             $incident = Incident::query()
-                ->where('name', 'Janela Única Outage')
+                ->where('name', $incidentName)
                 ->unresolved()
                 ->first();
-        }
 
-        if ($incident) {
-            $downtimeDuration = $this->formatDowntime($incident->created_at);
+            // Compatibility with old naming patterns if needed (like in MonitorJanelaUnica)
+            if (!$incident && $this->getMonitorName() === 'Janela Única') {
+                $incident = Incident::query()
+                    ->where('name', 'Janela Única Outage')
+                    ->unresolved()
+                    ->first();
+            }
 
-            $incident->update([
-                'status' => IncidentStatusEnum::fixed,
-                'message' => $incident->message . "\n\n**Resolvido.** {$publicMessage} Tempo de indisponibilidade: **{$downtimeDuration}**.",
-            ]);
+            if ($incident) {
+                $downtimeDuration = $this->formatDowntime($incident->created_at);
 
-            // Update component status back to operational
-            Component::find($this->getComponentId())?->update([
-                'status' => ComponentStatusEnum::operational,
-            ]);
+                $incident->update([
+                    'status' => IncidentStatusEnum::fixed,
+                    'message' => $incident->message . "\n\n**Resolvido.** {$publicMessage} Tempo de indisponibilidade: **{$downtimeDuration}**.",
+                ]);
 
-            $this->info("Incident resolved and component status updated to Operational. Downtime: {$downtimeDuration}");
-        } else {
-            $this->info($consoleMessage);
-        }
+                // Update component status back to operational
+                Component::find($this->getComponentId())?->update([
+                    'status' => ComponentStatusEnum::operational,
+                ]);
+
+                $this->info("Incident resolved and component status updated to Operational. Downtime: {$downtimeDuration}");
+            } else {
+                $this->info($consoleMessage);
+            }
+        });
     }
 
     /**
