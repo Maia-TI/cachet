@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Contracts\MonitorInterface;
+use App\Jobs\MonitorHealthCheckJob;
 use Cachet\Actions\Incident\CreateIncident;
 use Cachet\Data\Requests\Incident\CreateIncidentRequestData;
 use Cachet\Enums\ComponentStatusEnum;
@@ -23,20 +24,63 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
     protected int $timeout = 5;
 
     /**
+     * Create a new command instance.
+     */
+    public function __construct()
+    {
+        $this->signature .= ' {--sync : Run the monitor synchronously instead of queueing}';
+        
+        parent::__construct();
+    }
+
+    /**
      * Execute the console command.
      */
     public function handle(): void
     {
         $monitorName = $this->getMonitorName();
         $url = $this->getUrl();
+        $sync = $this->option('sync');
         
-        Log::info("Running monitor: {$monitorName} [{$url}]");
+        Log::info("Running monitor command: {$monitorName} [{$url}]" . ($sync ? ' (Sync mode)' : ' (Queued mode)'));
 
-        try {
-            $this->ensureComponentExists();
-        } catch (\Exception $e) {
-            Log::warning("Could not ensure component exists for {$monitorName}: {$e->getMessage()}");
+        // Part 2: Execution
+        if ($sync) {
+            try {
+                $this->ensureComponentExists();
+            } catch (\Exception $e) {
+                Log::warning("Could not ensure component exists for {$monitorName}: {$e->getMessage()}");
+            }
+            $this->performSyncCheck($url);
+        } else {
+            $this->dispatchHealthJob();
         }
+
+        Log::info("Monitor command finished dispatching/running: {$monitorName}");
+    }
+
+    /**
+     * Dispatch the health check to the queue.
+     */
+    protected function dispatchHealthJob(): void
+    {
+        MonitorHealthCheckJob::dispatch(
+            $this->getMonitorName(),
+            $this->getUrl(),
+            $this->getComponentId(),
+            $this->getPublicName(),
+            $this->timeout
+        );
+        
+        $this->info("Healt check for {$this->getMonitorName()} was pushed to the queue.");
+    }
+
+    /**
+     * Perform the health check synchronously.
+     */
+    protected function performSyncCheck(string $url): void
+    {
+        $monitorName = $this->getMonitorName();
 
         try {
             $response = $this->performRequest($url);
@@ -46,34 +90,20 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
                 $publicMessage = "{$this->getPublicName()} está indisponível (HTTP {$status}). ";
                 Log::error("[Monitor Failed] {$monitorName}: HTTP {$status}");
                 
-                try {
-                    $this->handleFailure("{$this->getPublicName()} is down (HTTP {$status})", $publicMessage);
-                } catch (\Exception $e) {
-                    Log::error("Failed to record failure in DB for {$monitorName}: {$e->getMessage()}");
-                }
+                $this->handleFailure("{$this->getPublicName()} is down (HTTP {$status})", $publicMessage);
             } else {
                 $status = $response->status();
                 $publicMessage = "{$this->getPublicName()} " . ($this->getPublicName() === 'Janela Única' ? 'online.' : 'voltou a operar normalmente.');
                 Log::info("[Monitor Success] {$monitorName}: HTTP {$status}");
                 
-                try {
-                    $this->handleSuccess("{$this->getPublicName()} is UP (HTTP {$status})", $publicMessage);
-                } catch (\Exception $e) {
-                    Log::error("Failed to record success in DB for {$monitorName}: {$e->getMessage()}");
-                }
+                $this->handleSuccess("{$this->getPublicName()} is UP (HTTP {$status})", $publicMessage);
             }
         } catch (\Exception $e) {
             $publicMessage = "{$this->getPublicName()} está inacessível (timeout/erro de conexão). ";
             Log::error("[Monitor Error] {$monitorName}: {$e->getMessage()}");
             
-            try {
-                $this->handleFailure("{$this->getPublicName()} is unreachable (Timeout/Error: {$e->getMessage()})", $publicMessage);
-            } catch (\Exception $e) {
-                Log::error("Failed to record reachability error in DB for {$monitorName}: {$e->getMessage()}");
-            }
+            $this->handleFailure("{$this->getPublicName()} is unreachable (Timeout/Error: {$e->getMessage()})", $publicMessage);
         }
-
-        Log::info("Monitor finished: {$monitorName}");
     }
 
     /**
@@ -97,7 +127,7 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
     }
 
     /**
-     * Perform the HTTP request. Overridable for special cases (like SSL issues).
+     * Perform the HTTP request. Overridable for special cases.
      */
     protected function performRequest(string $url)
     {
@@ -183,7 +213,7 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
                 ->unresolved()
                 ->first();
 
-            // Compatibility with old naming patterns if needed (like in MonitorJanelaUnica)
+            // Compatibility with old naming patterns
             if (!$incident && $this->getMonitorName() === 'Janela Única') {
                 $incident = Incident::query()
                     ->where('name', 'Janela Única Outage')
@@ -219,18 +249,10 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
         $diff = $since->diff(Carbon::now());
 
         $parts = [];
-        if ($diff->d > 0) {
-            $parts[] = $diff->d . ' ' . ($diff->d === 1 ? 'dia' : 'dias');
-        }
-        if ($diff->h > 0) {
-            $parts[] = $diff->h . ' ' . ($diff->h === 1 ? 'hora' : 'horas');
-        }
-        if ($diff->i > 0) {
-            $parts[] = $diff->i . ' ' . ($diff->i === 1 ? 'minuto' : 'minutos');
-        }
-        if (empty($parts)) {
-            $parts[] = $diff->s . ' ' . ($diff->s === 1 ? 'segundo' : 'segundos');
-        }
+        if ($diff->d > 0) $parts[] = $diff->d . ' ' . ($diff->d === 1 ? 'dia' : 'dias');
+        if ($diff->h > 0) $parts[] = $diff->h . ' ' . ($diff->h === 1 ? 'hora' : 'horas');
+        if ($diff->i > 0) $parts[] = $diff->i . ' ' . ($diff->i === 1 ? 'minuto' : 'minutos');
+        if (empty($parts)) $parts[] = $diff->s . ' ' . ($diff->s === 1 ? 'segundo' : 'segundos');
 
         return implode(', ', $parts);
     }
