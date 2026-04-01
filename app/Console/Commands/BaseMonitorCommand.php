@@ -41,15 +41,23 @@ abstract class BaseMonitorCommand extends Command implements MonitorInterface
         $monitorName = $this->getMonitorName();
         $url = $this->getUrl();
         $sync = $this->option('sync');
-        
+
+        $component = Component::find($this->getComponentId());
+        if ($component && !$component->enabled) {
+            $this->warn("Monitor for {$monitorName} is disabled. Skipping.");
+            return;
+        }
+
         Log::info("Running monitor command: {$monitorName} [{$url}]" . ($sync ? ' (Sync mode)' : ' (Queued mode)'));
 
         // Part 2: Execution
         if ($sync) {
-            try {
-                $this->ensureComponentExists();
-            } catch (\Exception $e) {
-                Log::warning("Could not ensure component exists for {$monitorName}: {$e->getMessage()}");
+            if (!$component) {
+                try {
+                    $this->ensureComponentExists();
+                } catch (\Exception $e) {
+                    Log::warning("Could not ensure component exists for {$monitorName}: {$e->getMessage()}");
+                }
             }
             $this->performSyncCheck($url);
         } else {

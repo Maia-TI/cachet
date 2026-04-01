@@ -55,7 +55,16 @@ class MonitorHealthCheckJob implements ShouldQueue
         Log::info("[Queue Attempt {$this->attempts()}] Running health check for: {$this->monitorName} [{$this->url}]");
 
         try {
-            $this->ensureComponentExists();
+            $component = Component::find($this->componentId);
+
+            if ($component && !$component->enabled) {
+                Log::info("[Monitor Skipped] {$this->monitorName}: Component is disabled.");
+                return;
+            }
+
+            if (!$component) {
+                $this->ensureComponentExists();
+            }
             
             $response = Http::timeout($this->timeout)->get($this->url);
 
