@@ -26,7 +26,7 @@ class MonitorHealthCheckJob implements ShouldQueue
 
     /**
      * The number of times the job may be attempted.
-     * With 3 tries and 30s schedule, this covers a ~1-minute window of confirmed failure.
+     * With 3 tries and 20s schedule, this covers a ~1-minute window of confirmed failure.
      */
     public int $tries = 3;
 

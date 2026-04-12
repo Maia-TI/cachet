@@ -35,9 +35,9 @@ use App\Console\Commands\MonitorJanelaUnicaLegado;
 use App\Console\Commands\MonitorJuSuporte;
 use Illuminate\Support\Facades\Schedule;
 
-Schedule::command(MonitorJanelaUnica::class)->everyThirtySeconds();
-Schedule::command(MonitorJuFinanceiro::class)->everyThirtySeconds();
-Schedule::command(MonitorDeepFace::class)->everyThirtySeconds();
-Schedule::command(MonitorJuConecta::class)->everyThirtySeconds();
-Schedule::command(MonitorJanelaUnicaLegado::class)->everyThirtySeconds();
-Schedule::command(MonitorJuSuporte::class)->everyThirtySeconds();
+Schedule::command(MonitorJanelaUnica::class)->everyTwentySeconds();
+Schedule::command(MonitorJuFinanceiro::class)->everyTwentySeconds();
+Schedule::command(MonitorDeepFace::class)->everyTwentySeconds();
+Schedule::command(MonitorJuConecta::class)->everyTwentySeconds();
+Schedule::command(MonitorJanelaUnicaLegado::class)->everyTwentySeconds();
+Schedule::command(MonitorJuSuporte::class)->everyTwentySeconds();
